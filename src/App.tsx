@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import civicsData from "../data/civics-questions-2025.json";
 
-type StudyMode = "random" | "ordered";
+type StudyMode = "random" | "ordered" | "hard";
 type ThemePreference = "system" | "light" | "dark";
 
 type CivicsQuestion = {
@@ -17,10 +17,10 @@ type CivicsQuestion = {
 type StoredState = {
   currentQuestionId: number;
   mode: StudyMode;
-  noRepeat: boolean;
   revealed: boolean;
   search: string;
   seenQuestionIds: number[];
+  hardQuestionIds: number[];
   theme: ThemePreference;
 };
 
@@ -29,12 +29,24 @@ const storageKey = "naturalization-study-state-v1";
 const defaultState: StoredState = {
   currentQuestionId: questions[0].id,
   mode: "random",
-  noRepeat: true,
   revealed: false,
   search: "",
   seenQuestionIds: [],
+  hardQuestionIds: [],
   theme: "system",
 };
+
+function cleanStoredQuestionIds(ids: unknown): number[] {
+  if (!Array.isArray(ids)) {
+    return [];
+  }
+
+  return [...new Set(ids.filter((id): id is number => typeof id === "number"))];
+}
+
+function cleanStoredMode(mode: unknown): StudyMode {
+  return mode === "ordered" || mode === "hard" ? mode : "random";
+}
 
 function loadStoredState(): StoredState {
   try {
@@ -45,19 +57,15 @@ function loadStoredState(): StoredState {
 
     const parsed = JSON.parse(stored) as Partial<StoredState>;
     return {
-      ...defaultState,
-      ...parsed,
       currentQuestionId:
         typeof parsed.currentQuestionId === "number"
           ? parsed.currentQuestionId
           : defaultState.currentQuestionId,
-      mode: parsed.mode === "ordered" ? "ordered" : "random",
-      noRepeat: Boolean(parsed.noRepeat),
+      mode: cleanStoredMode(parsed.mode),
       revealed: false,
       search: typeof parsed.search === "string" ? parsed.search : "",
-      seenQuestionIds: Array.isArray(parsed.seenQuestionIds)
-        ? parsed.seenQuestionIds.filter((id): id is number => typeof id === "number")
-        : [],
+      seenQuestionIds: cleanStoredQuestionIds(parsed.seenQuestionIds),
+      hardQuestionIds: cleanStoredQuestionIds(parsed.hardQuestionIds),
       theme:
         parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system"
           ? parsed.theme
@@ -114,48 +122,84 @@ function App() {
     () => new Set(state.seenQuestionIds),
     [state.seenQuestionIds],
   );
+  const hardQuestionIds = useMemo(
+    () => new Set(state.hardQuestionIds),
+    [state.hardQuestionIds],
+  );
   const normalizedSearch = state.search.trim().toLowerCase();
-  const filteredQuestions = useMemo(
+  const searchMatchedQuestions = useMemo(
     () =>
       normalizedSearch
         ? questions.filter((question) => matchesQuery(question, normalizedSearch))
         : questions,
     [normalizedSearch],
   );
-  const currentQuestion =
-    filteredQuestions.find((question) => question.id === state.currentQuestionId) ??
-    filteredQuestions[0] ??
-    questions[0];
-  const currentIndex = filteredQuestions.findIndex(
-    (question) => question.id === currentQuestion.id,
+  const hardQuestions = useMemo(
+    () => questions.filter((question) => hardQuestionIds.has(question.id)),
+    [hardQuestionIds],
   );
-  const unseenFilteredQuestions = filteredQuestions.filter(
+  const activeQuestions = useMemo(
+    () =>
+      state.mode === "hard"
+        ? searchMatchedQuestions.filter((question) => hardQuestionIds.has(question.id))
+        : searchMatchedQuestions,
+    [hardQuestionIds, searchMatchedQuestions, state.mode],
+  );
+  const currentQuestion =
+    activeQuestions.find((question) => question.id === state.currentQuestionId) ??
+    activeQuestions[0];
+  const currentIndex = currentQuestion
+    ? activeQuestions.findIndex((question) => question.id === currentQuestion.id)
+    : -1;
+  const unseenActiveQuestions = activeQuestions.filter(
     (question) => !seenQuestionIds.has(question.id),
   );
-  const nextUnseenQuestions = unseenFilteredQuestions.filter(
-    (question) => question.id !== currentQuestion.id,
+  const nextUnseenQuestions = unseenActiveQuestions.filter(
+    (question) => question.id !== currentQuestion?.id,
   );
   const hasSearch = normalizedSearch.length > 0;
-  const canGoNext = !state.noRepeat || nextUnseenQuestions.length > 0;
+  const hasHardQuestions = hardQuestions.length > 0;
+  const canGoNext = nextUnseenQuestions.length > 0;
+  const activeQuestionIds = useMemo(
+    () => new Set(activeQuestions.map((question) => question.id)),
+    [activeQuestions],
+  );
+  const isCurrentQuestionHard = currentQuestion
+    ? hardQuestionIds.has(currentQuestion.id)
+    : false;
+  const activeSeenCount = activeQuestions.filter((question) =>
+    seenQuestionIds.has(question.id),
+  ).length;
+  const canGoPrevious = currentQuestion
+    ? state.mode === "ordered"
+      ? activeQuestions.length > 1
+      : state.seenQuestionIds.some(
+          (id) => activeQuestionIds.has(id) && id !== currentQuestion.id,
+        )
+    : false;
 
   useEffect(() => {
-    if (filteredQuestions.length === 0) {
+    if (activeQuestions.length === 0) {
       return;
     }
 
-    if (!filteredQuestions.some((question) => question.id === state.currentQuestionId)) {
+    if (!activeQuestions.some((question) => question.id === state.currentQuestionId)) {
       setState((currentState) => ({
         ...currentState,
         currentQuestionId:
-          currentState.mode === "random"
-            ? getRandomItem(filteredQuestions).id
-            : filteredQuestions[0].id,
+          currentState.mode === "ordered"
+            ? activeQuestions[0].id
+            : getRandomItem(activeQuestions).id,
         revealed: false,
       }));
     }
-  }, [filteredQuestions, state.currentQuestionId]);
+  }, [activeQuestions, state.currentQuestionId]);
 
   useEffect(() => {
+    if (!currentQuestion) {
+      return;
+    }
+
     setState((currentState) => {
       if (currentState.seenQuestionIds.includes(currentQuestion.id)) {
         return currentState;
@@ -166,7 +210,7 @@ function App() {
         seenQuestionIds: [...currentState.seenQuestionIds, currentQuestion.id],
       };
     });
-  }, [currentQuestion.id]);
+  }, [currentQuestion]);
 
   function updateState(update: Partial<StoredState>) {
     setState((currentState) => ({ ...currentState, ...update }));
@@ -177,33 +221,23 @@ function App() {
   }
 
   function updateSearch(search: string) {
-    const normalizedQuery = search.trim().toLowerCase();
-    const matches = normalizedQuery
-      ? questions.filter((question) => matchesQuery(question, normalizedQuery))
-      : questions;
-    const currentQuestionMatches = matches.some(
-      (question) => question.id === state.currentQuestionId,
-    );
-
-    updateState({
-      search,
-      currentQuestionId: currentQuestionMatches
-        ? state.currentQuestionId
-        : (matches[0]?.id ?? state.currentQuestionId),
-      revealed: false,
-    });
+    updateState({ search, revealed: false });
   }
 
-  function getOrderedOffsetQuestion(offset: number): CivicsQuestion {
+  function getOrderedOffsetQuestion(offset: number): CivicsQuestion | undefined {
+    if (activeQuestions.length === 0 || currentIndex < 0) {
+      return undefined;
+    }
+
     const nextIndex =
-      (currentIndex + offset + filteredQuestions.length) % filteredQuestions.length;
-    return filteredQuestions[nextIndex];
+      (currentIndex + offset + activeQuestions.length) % activeQuestions.length;
+    return activeQuestions[nextIndex];
   }
 
   function getNextUnseenOrderedQuestion(): CivicsQuestion | undefined {
-    for (let offset = 1; offset < filteredQuestions.length; offset += 1) {
+    for (let offset = 1; offset < activeQuestions.length; offset += 1) {
       const candidate = getOrderedOffsetQuestion(offset);
-      if (!seenQuestionIds.has(candidate.id)) {
+      if (candidate && !seenQuestionIds.has(candidate.id)) {
         return candidate;
       }
     }
@@ -212,63 +246,87 @@ function App() {
   }
 
   function goToNextQuestion() {
-    if (filteredQuestions.length === 0) {
-      return;
-    }
-
-    if (state.noRepeat && nextUnseenQuestions.length === 0) {
+    if (!currentQuestion || activeQuestions.length === 0 || nextUnseenQuestions.length === 0) {
       return;
     }
 
     if (state.mode === "ordered") {
-      selectQuestion(
-        state.noRepeat
-          ? (getNextUnseenOrderedQuestion() ?? currentQuestion).id
-          : getOrderedOffsetQuestion(1).id,
-      );
+      selectQuestion((getNextUnseenOrderedQuestion() ?? currentQuestion).id);
       return;
     }
 
-    const candidates = state.noRepeat
-      ? nextUnseenQuestions
-      : filteredQuestions.filter((question) => question.id !== currentQuestion.id);
-    selectQuestion(getRandomItem(candidates.length > 0 ? candidates : filteredQuestions).id);
+    selectQuestion(getRandomItem(nextUnseenQuestions).id);
   }
 
   function goToPreviousQuestion() {
-    if (filteredQuestions.length === 0) {
+    if (!currentQuestion || activeQuestions.length === 0) {
       return;
     }
 
     if (state.mode === "ordered") {
-      selectQuestion(getOrderedOffsetQuestion(-1).id);
+      const previousQuestion = getOrderedOffsetQuestion(-1);
+      if (previousQuestion) {
+        selectQuestion(previousQuestion.id);
+      }
       return;
     }
 
     const previousSeenQuestion = [...state.seenQuestionIds]
       .reverse()
       .map((id) => questions.find((question) => question.id === id))
-      .find((question) => question && question.id !== currentQuestion.id);
+      .find(
+        (question) =>
+          question && activeQuestionIds.has(question.id) && question.id !== currentQuestion.id,
+      );
 
     if (previousSeenQuestion) {
       selectQuestion(previousSeenQuestion.id);
     }
   }
 
+  function toggleCurrentQuestionHard() {
+    if (!currentQuestion) {
+      return;
+    }
+
+    setState((currentState) => {
+      const alreadyHard = currentState.hardQuestionIds.includes(currentQuestion.id);
+      return {
+        ...currentState,
+        hardQuestionIds: alreadyHard
+          ? currentState.hardQuestionIds.filter((id) => id !== currentQuestion.id)
+          : [...currentState.hardQuestionIds, currentQuestion.id],
+      };
+    });
+  }
+
   function resetSeenQuestions() {
     if (
       window.confirm(
-        "Reset seen questions? This will clear your no-repeat progress on this device.",
+        "Reset seen questions? This will clear your study progress on this device.",
       )
     ) {
-      updateState({ seenQuestionIds: [currentQuestion.id], revealed: false });
+      updateState({
+        seenQuestionIds: currentQuestion ? [currentQuestion.id] : [],
+        revealed: false,
+      });
     }
   }
 
   const progressLabel =
-    filteredQuestions.length > 0
-      ? `${currentIndex + 1} of ${filteredQuestions.length}`
+    activeQuestions.length > 0 && currentIndex >= 0
+      ? `${currentIndex + 1} of ${activeQuestions.length}`
       : "0 of 0";
+  const emptyTitle =
+    state.mode === "hard" && !hasHardQuestions
+      ? "No hard questions yet"
+      : state.mode === "hard"
+        ? "No matching hard questions"
+        : "No matching questions";
+  const emptyDescription =
+    state.mode === "hard" && !hasHardQuestions
+      ? "Mark questions as hard from Random or Ordered mode, then come back here to study them."
+      : "Try clearing your search to see more questions.";
 
   return (
     <main className="min-h-screen bg-slate-200 px-3 py-3 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-50 sm:px-6">
@@ -297,9 +355,9 @@ function App() {
         </header>
 
         <section className="rounded-3xl bg-white p-3 shadow-lg shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
-              {(["random", "ordered"] as const).map((mode) => (
+          <div className="rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
+            <div className="grid grid-cols-3">
+              {(["random", "ordered", "hard"] as const).map((mode) => (
                 <button
                   className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
                     state.mode === mode
@@ -310,36 +368,40 @@ function App() {
                   type="button"
                   onClick={() => updateState({ mode })}
                 >
-                  {mode === "random" ? "Random" : "Ordered"}
+                  {mode === "random" ? "Random" : mode === "ordered" ? "Ordered" : "Hard"}
                 </button>
               ))}
             </div>
-
-            <label className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              <span className="hidden min-[360px]:inline">No repeats</span>
-              <span className="min-[360px]:hidden">Unique</span>
-              <input
-                className="peer sr-only"
-                checked={state.noRepeat}
-                type="checkbox"
-                onChange={(event) => updateState({ noRepeat: event.target.checked })}
-              />
-              <span className="relative h-6 w-11 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:bg-sky-600 peer-checked:after:translate-x-5 dark:bg-slate-700" />
-            </label>
           </div>
         </section>
 
         <section className="flex flex-col rounded-3xl bg-white p-4 shadow-xl shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30 sm:p-6">
-          {filteredQuestions.length === 0 ? (
+          {!currentQuestion ? (
             <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-              <p className="text-lg font-black">No matching questions</p>
-              <button
-                className="mt-4 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-950"
-                type="button"
-                onClick={() => updateSearch("")}
-              >
-                Clear search
-              </button>
+              <p className="text-lg font-black">{emptyTitle}</p>
+              <p className="mt-2 max-w-sm text-sm font-semibold text-slate-500 dark:text-slate-400">
+                {emptyDescription}
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {hasSearch ? (
+                  <button
+                    className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-950"
+                    type="button"
+                    onClick={() => updateSearch("")}
+                  >
+                    Clear search
+                  </button>
+                ) : null}
+                {state.mode === "hard" && !hasHardQuestions ? (
+                  <button
+                    className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    type="button"
+                    onClick={() => updateState({ mode: "random" })}
+                  >
+                    Study all questions
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : (
             <>
@@ -355,6 +417,11 @@ function App() {
                     65/20
                   </span>
                 ) : null}
+                {isCurrentQuestionHard ? (
+                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-rose-800 dark:bg-rose-950 dark:text-rose-200">
+                    Hard
+                  </span>
+                ) : null}
               </div>
 
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -364,12 +431,24 @@ function App() {
                 {currentQuestion.question}
               </h2>
 
+              <button
+                className={`mt-4 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                  isCurrentQuestionHard
+                    ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
+                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                }`}
+                type="button"
+                onClick={toggleCurrentQuestionHard}
+              >
+                {isCurrentQuestionHard ? "Marked as hard" : "Mark as hard"}
+              </button>
+
               <div className="grid grid-cols-2 gap-2 pt-4">
                 <button
                   className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
                   type="button"
                   onClick={goToPreviousQuestion}
-                  disabled={state.mode === "random" && state.seenQuestionIds.length <= 1}
+                  disabled={!canGoPrevious}
                 >
                   Previous
                 </button>
@@ -417,9 +496,10 @@ function App() {
               ) : null}
 
               <p className="mt-2 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Seen {seenQuestionIds.size} of {questions.length} total questions
-                {state.noRepeat && unseenFilteredQuestions.length === 0
-                  ? ". All matching questions have been seen."
+                Seen {activeSeenCount} of {activeQuestions.length}{" "}
+                {state.mode === "hard" ? "hard" : "matching"} questions
+                {unseenActiveQuestions.length === 0
+                  ? ". All active questions have been seen."
                   : ""}
               </p>
             </>
@@ -439,16 +519,16 @@ function App() {
             onChange={(event) => updateSearch(event.target.value)}
           />
 
-          {hasSearch && filteredQuestions.length > 0 ? (
+          {hasSearch && activeQuestions.length > 0 ? (
             <>
             <h2 className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {filteredQuestions.length} search results
+              {activeQuestions.length} search results
             </h2>
             <div className="mt-2 max-h-40 space-y-2 overflow-auto pr-1">
-              {filteredQuestions.map((question) => (
+              {activeQuestions.map((question) => (
                 <button
                   className={`w-full rounded-2xl p-2.5 text-left transition ${
-                    question.id === currentQuestion.id
+                    question.id === currentQuestion?.id
                       ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
                       : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
                   }`}
