@@ -256,7 +256,13 @@ function App() {
   }
 
   function resetSeenQuestions() {
-    updateState({ seenQuestionIds: [currentQuestion.id], revealed: false });
+    if (
+      window.confirm(
+        "Reset seen questions? This will clear your no-repeat progress on this device.",
+      )
+    ) {
+      updateState({ seenQuestionIds: [currentQuestion.id], revealed: false });
+    }
   }
 
   const progressLabel =
@@ -291,19 +297,7 @@ function App() {
         </header>
 
         <section className="rounded-3xl bg-white p-3 shadow-lg shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30">
-          <label className="sr-only" htmlFor="search">
-            Search questions or answers
-          </label>
-          <input
-            id="search"
-            className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-base outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:bg-slate-950 dark:focus:ring-sky-950"
-            placeholder="Search questions or answers"
-            type="search"
-            value={state.search}
-            onChange={(event) => updateSearch(event.target.value)}
-          />
-
-          <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
             <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
               {(["random", "ordered"] as const).map((mode) => (
                 <button
@@ -413,14 +407,7 @@ function App() {
                   Previous
                 </button>
                 <button
-                  className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 dark:border-slate-700 dark:text-slate-200"
-                  type="button"
-                  onClick={resetSeenQuestions}
-                >
-                  Reset seen
-                </button>
-                <button
-                  className="col-span-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white disabled:opacity-40 dark:bg-white dark:text-slate-950"
+                  className="rounded-2xl bg-slate-950 px-5 py-2.5 text-sm font-black text-white disabled:opacity-40 dark:bg-white dark:text-slate-950"
                   type="button"
                   onClick={goToNextQuestion}
                   disabled={!canGoNext}
@@ -439,8 +426,21 @@ function App() {
           )}
         </section>
 
-        {hasSearch && filteredQuestions.length > 0 ? (
-          <section className="rounded-3xl bg-white p-3 shadow-lg shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30">
+        <section className="rounded-3xl bg-white p-3 shadow-lg shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30">
+          <label className="sr-only" htmlFor="search">
+            Search questions or answers
+          </label>
+          <input
+            id="search"
+            className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-base outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500 dark:focus:bg-slate-950 dark:focus:ring-sky-950"
+            placeholder="Search questions or answers"
+            type="search"
+            value={state.search}
+            onChange={(event) => updateSearch(event.target.value)}
+          />
+
+          {hasSearch && filteredQuestions.length > 0 ? (
+            <>
             <h2 className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {filteredQuestions.length} search results
             </h2>
@@ -463,8 +463,19 @@ function App() {
                 </button>
               ))}
             </div>
-          </section>
-        ) : null}
+            </>
+          ) : null}
+        </section>
+
+        <div className="flex justify-end px-1">
+          <button
+            className="rounded-full px-2 py-1 text-[11px] font-bold text-slate-400 underline-offset-4 hover:text-slate-700 hover:underline dark:text-slate-500 dark:hover:text-slate-300"
+            type="button"
+            onClick={resetSeenQuestions}
+          >
+            Reset seen questions
+          </button>
+        </div>
       </div>
     </main>
   );
