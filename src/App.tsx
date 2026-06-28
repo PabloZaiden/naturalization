@@ -364,7 +364,26 @@ function App() {
                 {currentQuestion.question}
               </h2>
 
-              <div className="mt-4">
+              <div className="grid grid-cols-2 gap-2 pt-4">
+                <button
+                  className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
+                  type="button"
+                  onClick={goToPreviousQuestion}
+                  disabled={state.mode === "random" && state.seenQuestionIds.length <= 1}
+                >
+                  Previous
+                </button>
+                <button
+                  className="rounded-2xl bg-slate-950 px-5 py-2.5 text-sm font-black text-white disabled:opacity-40 dark:bg-white dark:text-slate-950"
+                  type="button"
+                  onClick={goToNextQuestion}
+                  disabled={!canGoNext}
+                >
+                  Next question
+                </button>
+              </div>
+
+              <div className="mt-3">
                 <button
                   className="w-full rounded-2xl bg-sky-600 px-5 py-3 text-base font-black text-white shadow-lg shadow-sky-200 transition active:scale-[0.99] dark:bg-sky-500 dark:shadow-sky-950/40"
                   type="button"
@@ -396,25 +415,6 @@ function App() {
                   ) : null}
                 </div>
               ) : null}
-
-              <div className="grid grid-cols-2 gap-2 pt-4">
-                <button
-                  className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-black text-slate-700 disabled:opacity-40 dark:border-slate-700 dark:text-slate-200"
-                  type="button"
-                  onClick={goToPreviousQuestion}
-                  disabled={state.mode === "random" && state.seenQuestionIds.length <= 1}
-                >
-                  Previous
-                </button>
-                <button
-                  className="rounded-2xl bg-slate-950 px-5 py-2.5 text-sm font-black text-white disabled:opacity-40 dark:bg-white dark:text-slate-950"
-                  type="button"
-                  onClick={goToNextQuestion}
-                  disabled={!canGoNext}
-                >
-                  Next question
-                </button>
-              </div>
 
               <p className="mt-2 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Seen {seenQuestionIds.size} of {questions.length} total questions
