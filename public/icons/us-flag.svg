@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="United States flag">
+  <rect width="512" height="512" rx="112" fill="#f8fafc"/>
+  <clipPath id="rounded">
+    <rect width="512" height="512" rx="112"/>
+  </clipPath>
+  <g clip-path="url(#rounded)">
+    <rect width="512" height="512" fill="#ffffff"/>
+    <g fill="#b91c1c">
+      <rect y="0" width="512" height="39.385"/>
+      <rect y="78.77" width="512" height="39.385"/>
+      <rect y="157.54" width="512" height="39.385"/>
+      <rect y="236.31" width="512" height="39.385"/>
+      <rect y="315.08" width="512" height="39.385"/>
+      <rect y="393.85" width="512" height="39.385"/>
+      <rect y="472.62" width="512" height="39.385"/>
+    </g>
+    <rect width="224" height="275.7" fill="#1d4ed8"/>
+    <g fill="#ffffff">
+      <circle cx="28" cy="30" r="9"/>
+      <circle cx="84" cy="30" r="9"/>
+      <circle cx="140" cy="30" r="9"/>
+      <circle cx="196" cy="30" r="9"/>
+      <circle cx="56" cy="75" r="9"/>
+      <circle cx="112" cy="75" r="9"/>
+      <circle cx="168" cy="75" r="9"/>
+      <circle cx="28" cy="120" r="9"/>
+      <circle cx="84" cy="120" r="9"/>
+      <circle cx="140" cy="120" r="9"/>
+      <circle cx="196" cy="120" r="9"/>
+      <circle cx="56" cy="165" r="9"/>
+      <circle cx="112" cy="165" r="9"/>
+      <circle cx="168" cy="165" r="9"/>
+      <circle cx="28" cy="210" r="9"/>
+      <circle cx="84" cy="210" r="9"/>
+      <circle cx="140" cy="210" r="9"/>
+      <circle cx="196" cy="210" r="9"/>
+      <circle cx="56" cy="255" r="9"/>
+      <circle cx="112" cy="255" r="9"/>
+      <circle cx="168" cy="255" r="9"/>
+    </g>
+  </g>
+</svg>

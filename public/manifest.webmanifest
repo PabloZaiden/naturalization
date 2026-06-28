@@ -1,0 +1,79 @@
+{
+  "name": "Naturalization Civics Study",
+  "short_name": "Civics Study",
+  "description": "Study the 2025 USCIS naturalization civics questions in your browser.",
+  "start_url": "/naturalization/",
+  "scope": "/naturalization/",
+  "display": "standalone",
+  "background_color": "#e2e8f0",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/naturalization/icons/us-flag-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/naturalization/icons/us-flag-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
