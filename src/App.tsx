@@ -21,6 +21,8 @@ type StoredState = {
   search: string;
   seenQuestionIds: number[];
   hardQuestionIds: number[];
+  knownQuestionIds: number[];
+  hideKnownQuestions: boolean;
   theme: ThemePreference;
 };
 
@@ -33,6 +35,8 @@ const defaultState: StoredState = {
   search: "",
   seenQuestionIds: [],
   hardQuestionIds: [],
+  knownQuestionIds: [],
+  hideKnownQuestions: false,
   theme: "system",
 };
 
@@ -66,6 +70,11 @@ function loadStoredState(): StoredState {
       search: typeof parsed.search === "string" ? parsed.search : "",
       seenQuestionIds: cleanStoredQuestionIds(parsed.seenQuestionIds),
       hardQuestionIds: cleanStoredQuestionIds(parsed.hardQuestionIds),
+      knownQuestionIds: cleanStoredQuestionIds(parsed.knownQuestionIds),
+      hideKnownQuestions:
+        typeof parsed.hideKnownQuestions === "boolean"
+          ? parsed.hideKnownQuestions
+          : defaultState.hideKnownQuestions,
       theme:
         parsed.theme === "light" || parsed.theme === "dark" || parsed.theme === "system"
           ? parsed.theme
@@ -126,6 +135,10 @@ function App() {
     () => new Set(state.hardQuestionIds),
     [state.hardQuestionIds],
   );
+  const knownQuestionIds = useMemo(
+    () => new Set(state.knownQuestionIds),
+    [state.knownQuestionIds],
+  );
   const normalizedSearch = state.search.trim().toLowerCase();
   const searchMatchedQuestions = useMemo(
     () =>
@@ -138,12 +151,31 @@ function App() {
     () => questions.filter((question) => hardQuestionIds.has(question.id)),
     [hardQuestionIds],
   );
+  const searchMatchedHardQuestions = useMemo(
+    () => searchMatchedQuestions.filter((question) => hardQuestionIds.has(question.id)),
+    [hardQuestionIds, searchMatchedQuestions],
+  );
+  const visibleMatchedQuestions = useMemo(
+    () =>
+      state.hideKnownQuestions
+        ? searchMatchedQuestions.filter((question) => !knownQuestionIds.has(question.id))
+        : searchMatchedQuestions,
+    [knownQuestionIds, searchMatchedQuestions, state.hideKnownQuestions],
+  );
+  const hiddenKnownCount = state.hideKnownQuestions
+    ? searchMatchedQuestions.length - visibleMatchedQuestions.length
+    : 0;
+  const hiddenKnownHardCount = state.hideKnownQuestions
+    ? searchMatchedHardQuestions.filter((question) => knownQuestionIds.has(question.id)).length
+    : 0;
+  const hiddenKnownActiveCount =
+    state.mode === "hard" ? hiddenKnownHardCount : hiddenKnownCount;
   const activeQuestions = useMemo(
     () =>
       state.mode === "hard"
-        ? searchMatchedQuestions.filter((question) => hardQuestionIds.has(question.id))
-        : searchMatchedQuestions,
-    [hardQuestionIds, searchMatchedQuestions, state.mode],
+        ? visibleMatchedQuestions.filter((question) => hardQuestionIds.has(question.id))
+        : visibleMatchedQuestions,
+    [hardQuestionIds, state.mode, visibleMatchedQuestions],
   );
   const currentQuestion =
     activeQuestions.find((question) => question.id === state.currentQuestionId) ??
@@ -166,6 +198,9 @@ function App() {
   );
   const isCurrentQuestionHard = currentQuestion
     ? hardQuestionIds.has(currentQuestion.id)
+    : false;
+  const isCurrentQuestionKnown = currentQuestion
+    ? knownQuestionIds.has(currentQuestion.id)
     : false;
   const activeSeenCount = activeQuestions.filter((question) =>
     seenQuestionIds.has(question.id),
@@ -300,6 +335,22 @@ function App() {
     });
   }
 
+  function toggleCurrentQuestionKnown() {
+    if (!currentQuestion) {
+      return;
+    }
+
+    setState((currentState) => {
+      const alreadyKnown = currentState.knownQuestionIds.includes(currentQuestion.id);
+      return {
+        ...currentState,
+        knownQuestionIds: alreadyKnown
+          ? currentState.knownQuestionIds.filter((id) => id !== currentQuestion.id)
+          : [...currentState.knownQuestionIds, currentQuestion.id],
+      };
+    });
+  }
+
   function resetSeenQuestions() {
     if (
       window.confirm(
@@ -317,16 +368,26 @@ function App() {
     activeQuestions.length > 0 && currentIndex >= 0
       ? `${currentIndex + 1} of ${activeQuestions.length}`
       : "0 of 0";
+  const emptyBecauseKnownHidden =
+    activeQuestions.length === 0 &&
+    state.hideKnownQuestions &&
+    (state.mode === "hard" ? hiddenKnownHardCount > 0 : hiddenKnownCount > 0);
   const emptyTitle =
     state.mode === "hard" && !hasHardQuestions
       ? "No hard questions yet"
-      : state.mode === "hard"
-        ? "No matching hard questions"
-        : "No matching questions";
+      : emptyBecauseKnownHidden
+        ? "Known questions are hidden"
+        : state.mode === "hard"
+          ? "No matching hard questions"
+          : "No matching questions";
   const emptyDescription =
     state.mode === "hard" && !hasHardQuestions
       ? "Mark questions as hard from Random or Ordered mode, then come back here to study them."
-      : "Try clearing your search to see more questions.";
+      : emptyBecauseKnownHidden
+        ? state.mode === "hard"
+          ? "Known hard questions are hidden. Show known questions to study them again."
+          : "All matching questions are marked as known and hidden. Show known questions to study them again."
+        : "Try clearing your search to see more questions.";
 
   return (
     <main className="min-h-screen bg-slate-200 px-3 py-3 text-slate-950 transition-colors dark:bg-slate-950 dark:text-slate-50 sm:px-6">
@@ -373,6 +434,22 @@ function App() {
               ))}
             </div>
           </div>
+          <button
+            aria-pressed={state.hideKnownQuestions}
+            className={`mt-3 w-full rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+              state.hideKnownQuestions
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            }`}
+            type="button"
+            onClick={() => updateState({ hideKnownQuestions: !state.hideKnownQuestions })}
+          >
+            {state.hideKnownQuestions
+              ? `Known questions hidden${
+                  hiddenKnownCount > 0 ? ` (${hiddenKnownCount} hidden)` : ""
+                }`
+              : "Known questions shown"}
+          </button>
         </section>
 
         <section className="flex flex-col rounded-3xl bg-white p-4 shadow-xl shadow-slate-300/70 transition-colors dark:bg-slate-900 dark:shadow-black/30 sm:p-6">
@@ -401,6 +478,15 @@ function App() {
                     Study all questions
                   </button>
                 ) : null}
+                {emptyBecauseKnownHidden ? (
+                  <button
+                    className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                    type="button"
+                    onClick={() => updateState({ hideKnownQuestions: false })}
+                  >
+                    Show known questions
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -422,6 +508,11 @@ function App() {
                     Hard
                   </span>
                 ) : null}
+                {isCurrentQuestionKnown ? (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                    Known
+                  </span>
+                ) : null}
               </div>
 
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -431,17 +522,30 @@ function App() {
                 {currentQuestion.question}
               </h2>
 
-              <button
-                className={`mt-4 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
-                  isCurrentQuestionHard
-                    ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                }`}
-                type="button"
-                onClick={toggleCurrentQuestionHard}
-              >
-                {isCurrentQuestionHard ? "Marked as hard" : "Mark as hard"}
-              </button>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  className={`rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                    isCurrentQuestionHard
+                      ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }`}
+                  type="button"
+                  onClick={toggleCurrentQuestionHard}
+                >
+                  {isCurrentQuestionHard ? "Marked as hard" : "Mark as hard"}
+                </button>
+                <button
+                  className={`rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                    isCurrentQuestionKnown
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }`}
+                  type="button"
+                  onClick={toggleCurrentQuestionKnown}
+                >
+                  {isCurrentQuestionKnown ? "Marked as known" : "Mark as known"}
+                </button>
+              </div>
 
               <div className="grid grid-cols-2 gap-2 pt-4">
                 <button
@@ -498,6 +602,11 @@ function App() {
               <p className="mt-2 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">
                 Seen {activeSeenCount} of {activeQuestions.length}{" "}
                 {state.mode === "hard" ? "hard" : "matching"} questions
+                {hiddenKnownActiveCount > 0
+                  ? `. ${hiddenKnownActiveCount} known ${
+                      hiddenKnownActiveCount === 1 ? "question is" : "questions are"
+                    } hidden.`
+                  : ""}
                 {unseenActiveQuestions.length === 0
                   ? ". All active questions have been seen."
                   : ""}
@@ -521,28 +630,34 @@ function App() {
 
           {hasSearch && activeQuestions.length > 0 ? (
             <>
-            <h2 className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {activeQuestions.length} search results
-            </h2>
-            <div className="mt-2 max-h-40 space-y-2 overflow-auto pr-1">
-              {activeQuestions.map((question) => (
-                <button
-                  className={`w-full rounded-2xl p-2.5 text-left transition ${
-                    question.id === currentQuestion?.id
-                      ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
-                      : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
-                  }`}
-                  key={question.id}
-                  type="button"
-                  onClick={() => selectQuestion(question.id)}
-                >
-                  <span className="text-xs font-black">#{question.id}</span>
-                  <span className="ml-2 text-sm font-bold leading-tight">
-                    {question.question}
-                  </span>
-                </button>
-              ))}
-            </div>
+              <h2 className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {activeQuestions.length} search results
+              </h2>
+              {hiddenKnownActiveCount > 0 ? (
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {hiddenKnownActiveCount} known{" "}
+                  {hiddenKnownActiveCount === 1 ? "question is" : "questions are"} hidden.
+                </p>
+              ) : null}
+              <div className="mt-2 max-h-40 space-y-2 overflow-auto pr-1">
+                {activeQuestions.map((question) => (
+                  <button
+                    className={`w-full rounded-2xl p-2.5 text-left transition ${
+                      question.id === currentQuestion?.id
+                        ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                        : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                    }`}
+                    key={question.id}
+                    type="button"
+                    onClick={() => selectQuestion(question.id)}
+                  >
+                    <span className="text-xs font-black">#{question.id}</span>
+                    <span className="ml-2 text-sm font-bold leading-tight">
+                      {question.question}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </>
           ) : null}
         </section>
