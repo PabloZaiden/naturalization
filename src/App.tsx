@@ -364,6 +364,10 @@ function App() {
     }
   }
 
+  function refreshApp() {
+    window.location.reload();
+  }
+
   const progressLabel =
     activeQuestions.length > 0 && currentIndex >= 0
       ? `${currentIndex + 1} of ${activeQuestions.length}`
@@ -397,7 +401,16 @@ function App() {
             <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
               2025 USCIS Civics
             </p>
-            <h1 className="text-xl font-black tracking-tight">Naturalization Study</h1>
+            <h1 className="text-xl">
+              <button
+                aria-label="Refresh Naturalization Study"
+                className="rounded-md bg-transparent text-left font-black tracking-tight text-inherit transition hover:text-sky-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 dark:hover:text-sky-300 dark:focus-visible:ring-sky-950"
+                type="button"
+                onClick={refreshApp}
+              >
+                Naturalization Study
+              </button>
+            </h1>
           </div>
           <label className="shrink-0">
             <span className="sr-only">Theme</span>
